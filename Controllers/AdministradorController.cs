@@ -50,7 +50,12 @@ namespace PlumitaGrisAPI.Controllers
             if (usuario == null)
                 return BadRequest(new { mensaje = "El usuario especificado no existe" });
 
-            if (usuario.Rol != "ADMINISTRADOR")
+            var idRolAdmin = await _context.Roles
+    .Where(r => r.Nombre == "ADMINISTRADOR")
+    .Select(r => r.IdRol)
+    .FirstOrDefaultAsync();
+
+            if (usuario.IdRol != idRolAdmin)
                 return BadRequest(new { mensaje = "El usuario debe tener rol ADMINISTRADOR para asignarse a esta tabla" });
 
             var yaEsAdmin = await _context.Administradores.AnyAsync(a => a.IdUsuario == dto.IdUsuario);

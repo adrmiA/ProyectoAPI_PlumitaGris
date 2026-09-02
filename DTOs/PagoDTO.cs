@@ -15,4 +15,10 @@ namespace PlumitaGrisAPI.DTOs
         [Range(0, double.MaxValue, ErrorMessage = "El monto no puede ser negativo")]
         public decimal Monto { get; set; }
     }
+
+    public class ActualizarEstadoPagoDTO
+    {
+        [Required(ErrorMessage = "El estado es obligatorio")]
+        public int IdEstadoPago { get; set; }
+    }
 }

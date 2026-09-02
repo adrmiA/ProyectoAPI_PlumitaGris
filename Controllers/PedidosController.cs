@@ -12,34 +12,30 @@ namespace PlumitaGrisAPI.Controllers
     {
         private readonly PlumitaGrisContext _context;
 
-        private static readonly string[] EstadosValidos = new[]
-        {
-            "PENDIENTE_PAGO", "PAGO_CONFIRMADO", "PEDIDO_CONFIRMADO",
-            "EN_PREPARACION", "LISTO_PARA_RECOGER", "ENTREGADO", "CANCELADO"
-        };
-
         public PedidosController(PlumitaGrisContext context)
         {
             _context = context;
         }
 
-        // GET: api/pedidos
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Pedido>>> GetPedidos()
         {
             return Ok(await _context.Pedidos
                 .Include(p => p.Cliente)
+                .Include(p => p.EstadoPedido)
+                .Include(p => p.ModalidadEntrega)
                 .Include(p => p.Detalles)
                 .ThenInclude(d => d.Producto)
                 .ToListAsync());
         }
 
-        // GET: api/pedidos/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Pedido>> GetPedido(int id)
         {
             var pedido = await _context.Pedidos
                 .Include(p => p.Cliente)
+                .Include(p => p.EstadoPedido)
+                .Include(p => p.ModalidadEntrega)
                 .Include(p => p.Detalles)
                 .ThenInclude(d => d.Producto)
                 .FirstOrDefaultAsync(p => p.IdPedido == id);
@@ -50,7 +46,6 @@ namespace PlumitaGrisAPI.Controllers
             return Ok(pedido);
         }
 
-        // POST: api/pedidos
         [HttpPost]
         public async Task<ActionResult<Pedido>> PostPedido(PedidoDTO dto)
         {
@@ -60,6 +55,15 @@ namespace PlumitaGrisAPI.Controllers
             if (!clienteExiste)
                 return BadRequest(new { mensaje = "El cliente especificado no existe" });
 
+            var modalidadExiste = await _context.ModalidadesEntrega.AnyAsync(m => m.IdModalidadEntrega == dto.IdModalidadEntrega);
+            if (!modalidadExiste)
+                return BadRequest(new { mensaje = "La modalidad de entrega especificada no existe" });
+
+            var idEstadoInicial = await _context.EstadosPedido
+                .Where(e => e.Nombre == "PENDIENTE_PAGO")
+                .Select(e => e.IdEstadoPedido)
+                .FirstOrDefaultAsync();
+
             using var transaccion = await _context.Database.BeginTransactionAsync();
             try
             {
@@ -67,8 +71,8 @@ namespace PlumitaGrisAPI.Controllers
                 {
                     IdCliente = dto.IdCliente,
                     FechaPedido = DateTime.Now,
-                    ModalidadEntrega = dto.ModalidadEntrega,
-                    Estado = "PENDIENTE_PAGO"
+                    IdModalidadEntrega = dto.IdModalidadEntrega,
+                    IdEstadoPedido = idEstadoInicial
                 };
 
                 _context.Pedidos.Add(pedido);
@@ -104,7 +108,7 @@ namespace PlumitaGrisAPI.Controllers
                 await transaccion.CommitAsync();
 
                 return CreatedAtAction(nameof(GetPedido), new { id = pedido.IdPedido },
-                    new { pedido.IdPedido, pedido.Estado, Total = totalPedido });
+                    new { pedido.IdPedido, pedido.IdEstadoPedido, Total = totalPedido });
             }
             catch (Exception ex)
             {
@@ -119,20 +123,20 @@ namespace PlumitaGrisAPI.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            if (!EstadosValidos.Contains(dto.Estado))
-                return BadRequest(new { mensaje = "Estado no válido", estadosPermitidos = EstadosValidos });
+            var estadoExiste = await _context.EstadosPedido.AnyAsync(e => e.IdEstadoPedido == dto.IdEstadoPedido);
+            if (!estadoExiste)
+                return BadRequest(new { mensaje = "El estado especificado no existe" });
 
             var pedido = await _context.Pedidos.FindAsync(id);
             if (pedido == null)
                 return NotFound(new { mensaje = $"Pedido con id {id} no encontrado" });
 
-            pedido.Estado = dto.Estado; // Los triggers TR_ActualizarInventario / TR_RestaurarInventario se disparan aquí
+            pedido.IdEstadoPedido = dto.IdEstadoPedido; // Dispara TR_ActualizarInventario / TR_RestaurarInventario / TR_AuditoriaPedido
             await _context.SaveChangesAsync();
 
             return Ok(pedido);
         }
 
-        // DELETE: api/pedidos/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeletePedido(int id)
         {

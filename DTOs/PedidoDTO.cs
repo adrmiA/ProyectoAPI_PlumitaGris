@@ -7,9 +7,8 @@ namespace PlumitaGrisAPI.DTOs
         [Required(ErrorMessage = "El cliente es obligatorio")]
         public int IdCliente { get; set; }
 
-        [Required]
-        [RegularExpression("RECOGER_EN_LOCAL|DOMICILIO", ErrorMessage = "Modalidad no válida")]
-        public string ModalidadEntrega { get; set; } = "RECOGER_EN_LOCAL";
+        [Required(ErrorMessage = "La modalidad de entrega es obligatoria")]
+        public int IdModalidadEntrega { get; set; }
 
         [Required(ErrorMessage = "El pedido debe tener al menos un producto")]
         [MinLength(1)]
@@ -28,7 +27,7 @@ namespace PlumitaGrisAPI.DTOs
 
     public class ActualizarEstadoDTO
     {
-        [Required]
-        public string Estado { get; set; } = string.Empty;
+        [Required(ErrorMessage = "El estado es obligatorio")]
+        public int IdEstadoPedido { get; set; }
     }
 }

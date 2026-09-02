@@ -20,13 +20,18 @@ namespace PlumitaGrisAPI.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Pago>>> GetPagos()
         {
-            return Ok(await _context.Pagos.Include(p => p.Pedido).ToListAsync());
+            return Ok(await _context.Pagos
+                .Include(p => p.Pedido)
+                .Include(p => p.EstadoPago)
+                .ToListAsync());
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<Pago>> GetPago(int id)
         {
-            var pago = await _context.Pagos.Include(p => p.Pedido)
+            var pago = await _context.Pagos
+                .Include(p => p.Pedido)
+                .Include(p => p.EstadoPago)
                 .FirstOrDefaultAsync(p => p.IdPago == id);
 
             if (pago == null)
@@ -48,12 +53,17 @@ namespace PlumitaGrisAPI.Controllers
             if (pagoExiste)
                 return Conflict(new { mensaje = "Este pedido ya tiene un pago registrado" });
 
+            var idEstadoInicial = await _context.EstadosPago
+                .Where(e => e.Nombre == "PENDIENTE")
+                .Select(e => e.IdEstadoPago)
+                .FirstOrDefaultAsync();
+
             var pago = new Pago
             {
                 IdPedido = dto.IdPedido,
                 MetodoPago = dto.MetodoPago,
                 Monto = dto.Monto,
-                EstadoPago = "PENDIENTE",
+                IdEstadoPago = idEstadoInicial,
                 FechaPago = DateTime.Now
             };
 
@@ -63,28 +73,35 @@ namespace PlumitaGrisAPI.Controllers
             return CreatedAtAction(nameof(GetPago), new { id = pago.IdPago }, pago);
         }
 
-        // PUT: api/pagos/5/estado  → aprobar o rechazar el pago
+        // PUT: api/pagos/5/estado
         [HttpPut("{id}/estado")]
-        public async Task<IActionResult> ActualizarEstadoPago(int id, [FromBody] string estado)
+        public async Task<IActionResult> ActualizarEstadoPago(int id, ActualizarEstadoPagoDTO dto)
         {
-            var estadosValidos = new[] { "PENDIENTE", "APROBADO", "RECHAZADO" };
-            if (!estadosValidos.Contains(estado))
-                return BadRequest(new { mensaje = "Estado no válido", estadosPermitidos = estadosValidos });
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var estado = await _context.EstadosPago.FindAsync(dto.IdEstadoPago);
+            if (estado == null)
+                return BadRequest(new { mensaje = "El estado especificado no existe" });
 
             var pago = await _context.Pagos.FindAsync(id);
             if (pago == null)
                 return NotFound(new { mensaje = $"Pago con id {id} no encontrado" });
 
-            pago.EstadoPago = estado;
+            pago.IdEstadoPago = dto.IdEstadoPago;
             await _context.SaveChangesAsync();
 
-            // Si se aprueba, actualizamos el estado del pedido
-            if (estado == "APROBADO")
+            // Si se aprueba, actualizamos el estado del pedido a PAGO_CONFIRMADO
+            if (estado.Nombre == "APROBADO")
             {
                 var pedido = await _context.Pedidos.FindAsync(pago.IdPedido);
                 if (pedido != null)
                 {
-                    pedido.Estado = "PAGO_CONFIRMADO";
+                    var idPagoConfirmado = await _context.EstadosPedido
+                        .Where(e => e.Nombre == "PAGO_CONFIRMADO")
+                        .Select(e => e.IdEstadoPedido)
+                        .FirstOrDefaultAsync();
+
+                    pedido.IdEstadoPedido = idPagoConfirmado;
                     await _context.SaveChangesAsync();
                 }
             }

@@ -17,8 +17,7 @@ namespace PlumitaGrisAPI.DTOs
         [MinLength(6, ErrorMessage = "La contraseña debe tener al menos 6 caracteres")]
         public string Contrasena { get; set; } = string.Empty;
 
-        [Required]
-        [RegularExpression("CLIENTE|ADMINISTRADOR", ErrorMessage = "El rol debe ser CLIENTE o ADMINISTRADOR")]
-        public string Rol { get; set; } = string.Empty;
+        [Required(ErrorMessage = "El rol es obligatorio")]
+        public int IdRol { get; set; }
     }
 }

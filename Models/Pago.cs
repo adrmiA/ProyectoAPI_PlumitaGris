@@ -19,12 +19,13 @@ namespace PlumitaGrisAPI.Models
         [Column("monto")]
         public decimal Monto { get; set; }
 
-        [Column("estado_pago")]
-        public string EstadoPago { get; set; } = "PENDIENTE";
+        [Column("id_estado_pago")]
+        public int IdEstadoPago { get; set; }
 
         [Column("fecha_pago")]
         public DateTime FechaPago { get; set; }
 
         public Pedido? Pedido { get; set; }
+        public EstadoPago? EstadoPago { get; set; }
     }
 }

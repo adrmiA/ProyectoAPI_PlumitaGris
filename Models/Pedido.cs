@@ -16,13 +16,15 @@ namespace PlumitaGrisAPI.Models
         [Column("fecha_pedido")]
         public DateTime FechaPedido { get; set; }
 
-        [Column("modalidad_entrega")]
-        public string ModalidadEntrega { get; set; } = "RECOGER_EN_LOCAL";
+        [Column("id_modalidad_entrega")]
+        public int IdModalidadEntrega { get; set; }
 
-        [Column("estado")]
-        public string Estado { get; set; } = "PENDIENTE_PAGO";
+        [Column("id_estado_pedido")]
+        public int IdEstadoPedido { get; set; }
 
         public Cliente? Cliente { get; set; }
+        public ModalidadEntrega? ModalidadEntrega { get; set; }
+        public EstadoPedido? EstadoPedido { get; set; }
         public ICollection<DetallePedido>? Detalles { get; set; }
     }
 }

@@ -20,13 +20,16 @@ namespace PlumitaGrisAPI.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Usuario>>> GetUsuarios()
         {
-            return Ok(await _context.Usuarios.ToListAsync());
+            return Ok(await _context.Usuarios.Include(u => u.Rol).ToListAsync());
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<Usuario>> GetUsuario(int id)
         {
-            var usuario = await _context.Usuarios.FindAsync(id);
+            var usuario = await _context.Usuarios
+                .Include(u => u.Rol)
+                .FirstOrDefaultAsync(u => u.IdUsuario == id);
+
             if (usuario == null)
                 return NotFound(new { mensaje = $"Usuario con id {id} no encontrado" });
 
@@ -42,12 +45,16 @@ namespace PlumitaGrisAPI.Controllers
             if (correoExiste)
                 return Conflict(new { mensaje = "Ya existe un usuario con ese correo" });
 
+            var rolExiste = await _context.Roles.AnyAsync(r => r.IdRol == dto.IdRol);
+            if (!rolExiste)
+                return BadRequest(new { mensaje = "El rol especificado no existe" });
+
             var usuario = new Usuario
             {
                 Nombre = dto.Nombre,
                 Correo = dto.Correo,
                 Contrasena = dto.Contrasena, // En producción: hashear la contraseña
-                Rol = dto.Rol,
+                IdRol = dto.IdRol,
                 FechaRegistro = DateTime.Now
             };
 
@@ -66,9 +73,13 @@ namespace PlumitaGrisAPI.Controllers
             if (usuario == null)
                 return NotFound(new { mensaje = $"Usuario con id {id} no encontrado" });
 
+            var rolExiste = await _context.Roles.AnyAsync(r => r.IdRol == dto.IdRol);
+            if (!rolExiste)
+                return BadRequest(new { mensaje = "El rol especificado no existe" });
+
             usuario.Nombre = dto.Nombre;
             usuario.Correo = dto.Correo;
-            usuario.Rol = dto.Rol;
+            usuario.IdRol = dto.IdRol;
 
             await _context.SaveChangesAsync();
             return Ok(usuario);

@@ -20,6 +20,12 @@ namespace PlumitaGrisAPI.Data
         public DbSet<Pago> Pagos { get; set; }
         public DbSet<Auditoria> Auditorias { get; set; }
 
+        // Catálogos
+        public DbSet<Rol> Roles { get; set; }
+        public DbSet<EstadoPedido> EstadosPedido { get; set; }
+        public DbSet<ModalidadEntrega> ModalidadesEntrega { get; set; }
+        public DbSet<EstadoPago> EstadosPago { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Cliente>()
@@ -76,6 +82,32 @@ namespace PlumitaGrisAPI.Data
                 .HasOne(pa => pa.Pedido)
                 .WithOne()
                 .HasForeignKey<Pago>(pa => pa.IdPedido);
+
+            // ---- Relaciones con catálogos ----
+            modelBuilder.Entity<Usuario>()
+                .HasOne(u => u.Rol)
+                .WithMany()
+                .HasForeignKey(u => u.IdRol);
+
+            modelBuilder.Entity<Pedido>()
+                .HasOne(p => p.EstadoPedido)
+                .WithMany()
+                .HasForeignKey(p => p.IdEstadoPedido);
+
+            modelBuilder.Entity<Pedido>()
+                .HasOne(p => p.ModalidadEntrega)
+                .WithMany()
+                .HasForeignKey(p => p.IdModalidadEntrega);
+
+            modelBuilder.Entity<Pago>()
+                .HasOne(pa => pa.EstadoPago)
+                .WithMany()
+                .HasForeignKey(pa => pa.IdEstadoPago);
+
+            // Deshabilitar OUTPUT clause en tablas con triggers (requerido por EF Core 7+)
+            modelBuilder.Entity<Producto>().ToTable(tb => tb.UseSqlOutputClause(false));
+            modelBuilder.Entity<Pedido>().ToTable(tb => tb.UseSqlOutputClause(false));
+            modelBuilder.Entity<Usuario>().ToTable(tb => tb.UseSqlOutputClause(false));
 
             base.OnModelCreating(modelBuilder);
         }

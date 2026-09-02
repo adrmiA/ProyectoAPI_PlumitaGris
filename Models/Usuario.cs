@@ -19,10 +19,12 @@ namespace PlumitaGrisAPI.Models
         [Column("contrasena")]
         public string Contrasena { get; set; } = string.Empty;
 
-        [Column("rol")]
-        public string Rol { get; set; } = string.Empty;
+        [Column("id_rol")]
+        public int IdRol { get; set; }
 
         [Column("fecha_registro")]
         public DateTime FechaRegistro { get; set; }
+
+        public Rol? Rol { get; set; }
     }
 }
