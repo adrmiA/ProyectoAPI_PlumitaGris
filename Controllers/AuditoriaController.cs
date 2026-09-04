@@ -16,9 +16,6 @@ namespace PlumitaGrisAPI.Controllers
         }
 
         // GET: api/auditoria
-        // Los registros aquí los generan automáticamente los triggers:
-        // TR_AuditoriaProducto_Update, TR_AuditoriaProducto_Delete,
-        // TR_AuditoriaPedido, TR_AuditoriaUsuario
         [HttpGet]
         public async Task<ActionResult> GetAuditoria()
         {
@@ -82,8 +79,5 @@ namespace PlumitaGrisAPI.Controllers
             return Ok(registros);
         }
 
-        // Nota: No se exponen POST/PUT/DELETE porque la tabla AUDITORIA
-        // se llena exclusivamente mediante los triggers definidos en SQL Server.
-        // Permitir escritura manual rompería la integridad del log de auditoría.
     }
 }

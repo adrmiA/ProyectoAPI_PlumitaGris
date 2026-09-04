@@ -104,7 +104,6 @@ namespace PlumitaGrisAPI.Data
                 .WithMany()
                 .HasForeignKey(pa => pa.IdEstadoPago);
 
-            // Deshabilitar OUTPUT clause en tablas con triggers (requerido por EF Core 7+)
             modelBuilder.Entity<Producto>().ToTable(tb => tb.UseSqlOutputClause(false));
             modelBuilder.Entity<Pedido>().ToTable(tb => tb.UseSqlOutputClause(false));
             modelBuilder.Entity<Usuario>().ToTable(tb => tb.UseSqlOutputClause(false));

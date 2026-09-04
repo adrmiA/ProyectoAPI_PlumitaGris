@@ -106,8 +106,6 @@ namespace PlumitaGrisAPI.Controllers
             }
             catch (DbUpdateException)
             {
-                // fk_auditoria_administrador tiene ON DELETE SET NULL, así que normalmente
-                // esto no debería fallar, pero se captura por seguridad
                 return Conflict(new { mensaje = "No se pudo eliminar el administrador" });
             }
         }

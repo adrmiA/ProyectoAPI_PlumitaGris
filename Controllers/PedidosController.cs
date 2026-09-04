@@ -131,7 +131,7 @@ namespace PlumitaGrisAPI.Controllers
             if (pedido == null)
                 return NotFound(new { mensaje = $"Pedido con id {id} no encontrado" });
 
-            pedido.IdEstadoPedido = dto.IdEstadoPedido; // Dispara TR_ActualizarInventario / TR_RestaurarInventario / TR_AuditoriaPedido
+            pedido.IdEstadoPedido = dto.IdEstadoPedido; 
             await _context.SaveChangesAsync();
 
             return Ok(pedido);

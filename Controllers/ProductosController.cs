@@ -11,10 +11,16 @@ namespace PlumitaGrisAPI.Controllers
     public class ProductosController : ControllerBase
     {
         private readonly PlumitaGrisContext _context;
+        private readonly IWebHostEnvironment _environment;
 
-        public ProductosController(PlumitaGrisContext context)
+        // Extensiones de imagen permitidas
+        private static readonly string[] ExtensionesPermitidas = { ".jpg", ".jpeg", ".png", ".webp" };
+        private const long TamanioMaximoBytes = 5 * 1024 * 1024; // 5 MB
+
+        public ProductosController(PlumitaGrisContext context, IWebHostEnvironment environment)
         {
             _context = context;
+            _environment = environment;
         }
 
         // GET: api/productos
@@ -122,6 +128,59 @@ namespace PlumitaGrisAPI.Controllers
             }
         }
 
+        // POST: api/productos/5/imagen
+        [HttpPost("{id}/imagen")]
+        [RequestSizeLimit(TamanioMaximoBytes)]
+        public async Task<ActionResult> SubirImagen(int id, IFormFile archivo)
+        {
+            var producto = await _context.Productos.FindAsync(id);
+            if (producto == null)
+                return NotFound(new { mensaje = $"Producto con id {id} no encontrado" });
+
+            if (archivo == null || archivo.Length == 0)
+                return BadRequest(new { mensaje = "No se envió ningún archivo" });
+
+            if (archivo.Length > TamanioMaximoBytes)
+                return BadRequest(new { mensaje = "El archivo supera el tamaño máximo permitido (5 MB)" });
+
+            var extension = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+            if (!ExtensionesPermitidas.Contains(extension))
+                return BadRequest(new { mensaje = "Formato de imagen no permitido. Usa jpg, jpeg, png o webp" });
+
+            try
+            {
+                // Carpeta física: wwwroot/imagenes/productos
+                var carpetaImagenes = Path.Combine(_environment.WebRootPath, "imagenes", "productos");
+                Directory.CreateDirectory(carpetaImagenes);
+
+                var nombreArchivo = $"producto_{id}_{Guid.NewGuid()}{extension}";
+                var rutaFisica = Path.Combine(carpetaImagenes, nombreArchivo);
+
+                if (!string.IsNullOrEmpty(producto.ImagenUrl))
+                {
+                    var rutaAnterior = Path.Combine(_environment.WebRootPath,
+                        producto.ImagenUrl.TrimStart('/'));
+                    if (System.IO.File.Exists(rutaAnterior))
+                        System.IO.File.Delete(rutaAnterior);
+                }
+
+                using (var stream = new FileStream(rutaFisica, FileMode.Create))
+                {
+                    await archivo.CopyToAsync(stream);
+                }
+
+                // URL relativa que se guarda en la base de datos
+                producto.ImagenUrl = $"/imagenes/productos/{nombreArchivo}";
+                await _context.SaveChangesAsync();
+
+                return Ok(new { mensaje = "Imagen subida correctamente", imagenUrl = producto.ImagenUrl });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { mensaje = "Error al subir la imagen", detalle = ex.Message });
+            }
+        }
+
         // GET: api/productos/disponibles
         [HttpGet("disponibles")]
         public async Task<ActionResult> GetProductosDisponibles()
@@ -133,8 +192,15 @@ namespace PlumitaGrisAPI.Controllers
                     {
                         p.IdProducto,
                         p.Nombre,
-                        Categoria = p.Categoria!.Nombre,
+                        p.Descripcion,
+                        Categoria = new
+                        {
+                            IdCategoria = p.IdCategoria,
+                            Nombre = p.Categoria!.Nombre
+                        },
+                        IdCategoria = p.IdCategoria,
                         p.Precio,
+                        p.ImagenUrl,
                         i.CantidadDisponible
                     })
                 .Where(x => x.CantidadDisponible > 0)

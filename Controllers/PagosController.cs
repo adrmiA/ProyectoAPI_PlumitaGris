@@ -90,7 +90,6 @@ namespace PlumitaGrisAPI.Controllers
             pago.IdEstadoPago = dto.IdEstadoPago;
             await _context.SaveChangesAsync();
 
-            // Si se aprueba, actualizamos el estado del pedido a PAGO_CONFIRMADO
             if (estado.Nombre == "APROBADO")
             {
                 var pedido = await _context.Pedidos.FindAsync(pago.IdPedido);

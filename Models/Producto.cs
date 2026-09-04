@@ -22,6 +22,9 @@ namespace PlumitaGrisAPI.Models
         [Column("id_categoria")]
         public int IdCategoria { get; set; }
 
+        [Column("imagen_url")]
+        public string? ImagenUrl { get; set; }
+
         public Categoria? Categoria { get; set; }
     }
 }
