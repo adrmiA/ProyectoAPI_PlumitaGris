@@ -3,9 +3,6 @@ using PlumitaGrisAPI.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Asegurar que exista físicamente la carpeta wwwroot y que WebRootPath
-// quede correctamente configurado (este proyecto se creó como Web API
-// pura, sin carpeta wwwroot por defecto).
 var webRootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(webRootPath);
 builder.Environment.WebRootPath = webRootPath;
