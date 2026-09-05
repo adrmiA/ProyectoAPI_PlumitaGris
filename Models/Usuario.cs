@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace PlumitaGrisAPI.Models
 {
@@ -17,6 +18,7 @@ namespace PlumitaGrisAPI.Models
         public string Correo { get; set; } = string.Empty;
 
         [Column("contrasena")]
+        [JsonIgnore] 
         public string Contrasena { get; set; } = string.Empty;
 
         [Column("id_rol")]

@@ -13,7 +13,6 @@ namespace PlumitaGrisAPI.Controllers
         private readonly PlumitaGrisContext _context;
         private readonly IWebHostEnvironment _environment;
 
-        // Extensiones de imagen permitidas
         private static readonly string[] ExtensionesPermitidas = { ".jpg", ".jpeg", ".png", ".webp" };
         private const long TamanioMaximoBytes = 5 * 1024 * 1024; // 5 MB
 
@@ -63,7 +62,8 @@ namespace PlumitaGrisAPI.Controllers
                     Nombre = dto.Nombre,
                     Descripcion = dto.Descripcion,
                     Precio = dto.Precio,
-                    IdCategoria = dto.IdCategoria
+                    IdCategoria = dto.IdCategoria,
+                    Activo = true
                 };
 
                 _context.Productos.Add(producto);
@@ -108,6 +108,26 @@ namespace PlumitaGrisAPI.Controllers
             return Ok(producto);
         }
 
+        // PUT: api/productos/5/estado
+        // Activa o desactiva un producto sin borrarlo. Útil para productos que
+        // ya tienen pedidos asociados y no se pueden eliminar por integridad referencial:
+        // se desactivan para que dejen de mostrarse (p. ej. en la app móvil del cliente),
+        // pero el historial de pedidos se conserva intacto.
+        [HttpPut("{id}/estado")]
+        public async Task<IActionResult> ActualizarEstadoProducto(int id, ActualizarEstadoProductoDTO dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var producto = await _context.Productos.FindAsync(id);
+            if (producto == null)
+                return NotFound(new { mensaje = $"Producto con id {id} no encontrado" });
+
+            producto.Activo = dto.Activo;
+            await _context.SaveChangesAsync();
+
+            return Ok(producto);
+        }
+
         // DELETE: api/productos/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProducto(int id)
@@ -116,15 +136,26 @@ namespace PlumitaGrisAPI.Controllers
             if (producto == null)
                 return NotFound(new { mensaje = $"Producto con id {id} no encontrado" });
 
+            var tienePedidos = await _context.DetallesPedido.AnyAsync(dp => dp.IdProducto == id);
+            if (tienePedidos)
+                return Conflict(new { mensaje = "No se puede eliminar: el producto tiene pedidos asociados" });
+
             try
             {
+                var inventario = await _context.Inventarios.FirstOrDefaultAsync(i => i.IdProducto == id);
+                if (inventario != null)
+                    _context.Inventarios.Remove(inventario);
+
+                var detallesCarrito = _context.DetallesCarrito.Where(dc => dc.IdProducto == id);
+                _context.DetallesCarrito.RemoveRange(detallesCarrito);
+
                 _context.Productos.Remove(producto);
                 await _context.SaveChangesAsync();
                 return NoContent();
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex)
             {
-                return Conflict(new { mensaje = "No se puede eliminar: el producto tiene pedidos asociados" });
+                return Conflict(new { mensaje = "No se puede eliminar el producto", detalle = ex.InnerException?.Message ?? ex.Message });
             }
         }
 
@@ -149,7 +180,6 @@ namespace PlumitaGrisAPI.Controllers
 
             try
             {
-                // Carpeta física: wwwroot/imagenes/productos
                 var carpetaImagenes = Path.Combine(_environment.WebRootPath, "imagenes", "productos");
                 Directory.CreateDirectory(carpetaImagenes);
 
@@ -201,9 +231,10 @@ namespace PlumitaGrisAPI.Controllers
                         IdCategoria = p.IdCategoria,
                         p.Precio,
                         p.ImagenUrl,
+                        p.Activo,
                         i.CantidadDisponible
                     })
-                .Where(x => x.CantidadDisponible > 0)
+                .Where(x => x.CantidadDisponible > 0 && x.Activo)
                 .ToListAsync();
 
             return Ok(productos);

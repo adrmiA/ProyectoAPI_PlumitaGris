@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PlumitaGrisAPI.Data;
 using PlumitaGrisAPI.DTOs;
 using PlumitaGrisAPI.Models;
+using PlumitaGrisAPI.Utils;
 
 namespace PlumitaGrisAPI.Controllers
 {
@@ -53,7 +54,7 @@ namespace PlumitaGrisAPI.Controllers
             {
                 Nombre = dto.Nombre,
                 Correo = dto.Correo,
-                Contrasena = dto.Contrasena, // En producción: hashear la contraseña
+                Contrasena = PasswordHasher.Hash(dto.Contrasena),
                 IdRol = dto.IdRol,
                 FechaRegistro = DateTime.Now
             };
@@ -80,6 +81,9 @@ namespace PlumitaGrisAPI.Controllers
             usuario.Nombre = dto.Nombre;
             usuario.Correo = dto.Correo;
             usuario.IdRol = dto.IdRol;
+
+            if (!string.IsNullOrWhiteSpace(dto.Contrasena))
+                usuario.Contrasena = PasswordHasher.Hash(dto.Contrasena);
 
             await _context.SaveChangesAsync();
             return Ok(usuario);

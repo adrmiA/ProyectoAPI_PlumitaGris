@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PlumitaGrisAPI.Data;
 using PlumitaGrisAPI.DTOs;
 using PlumitaGrisAPI.Models;
+using PlumitaGrisAPI.Services;
 
 namespace PlumitaGrisAPI.Controllers
 {
@@ -92,16 +93,43 @@ namespace PlumitaGrisAPI.Controllers
 
             if (estado.Nombre == "APROBADO")
             {
-                var pedido = await _context.Pedidos.FindAsync(pago.IdPedido);
+                var pedido = await _context.Pedidos
+                    .Include(p => p.EstadoPedido)
+                    .FirstOrDefaultAsync(p => p.IdPedido == pago.IdPedido);
+
                 if (pedido != null)
                 {
-                    var idPagoConfirmado = await _context.EstadosPedido
-                        .Where(e => e.Nombre == "PAGO_CONFIRMADO")
-                        .Select(e => e.IdEstadoPedido)
-                        .FirstOrDefaultAsync();
+                    var nuevoEstado = await _context.EstadosPedido
+                        .FirstOrDefaultAsync(e => e.Nombre == "EN PREPARACION");
 
-                    pedido.IdEstadoPedido = idPagoConfirmado;
-                    await _context.SaveChangesAsync();
+                    if (nuevoEstado != null)
+                    {
+                        var estadoAnteriorNombre = pedido.EstadoPedido?.Nombre;
+
+                        using var transaccion = await _context.Database.BeginTransactionAsync();
+                        try
+                        {
+                            var errorStock = await InventarioService.AjustarStockPorCambioEstado(
+                                _context, pedido.IdPedido, estadoAnteriorNombre, nuevoEstado.Nombre);
+
+                            if (errorStock == null)
+                            {
+                                pedido.IdEstadoPedido = nuevoEstado.IdEstadoPedido;
+                                await _context.SaveChangesAsync();
+                                await transaccion.CommitAsync();
+                            }
+                            else
+                            {
+                                await transaccion.RollbackAsync();
+                                return Conflict(new { mensaje = errorStock });
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            await transaccion.RollbackAsync();
+                            throw;
+                        }
+                    }
                 }
             }
 

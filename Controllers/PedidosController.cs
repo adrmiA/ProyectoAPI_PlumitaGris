@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PlumitaGrisAPI.Data;
 using PlumitaGrisAPI.DTOs;
 using PlumitaGrisAPI.Models;
+using PlumitaGrisAPI.Services;
 
 namespace PlumitaGrisAPI.Controllers
 {
@@ -22,10 +23,11 @@ namespace PlumitaGrisAPI.Controllers
         {
             return Ok(await _context.Pedidos
                 .Include(p => p.Cliente)
+                    .ThenInclude(c => c.Usuario)
                 .Include(p => p.EstadoPedido)
                 .Include(p => p.ModalidadEntrega)
                 .Include(p => p.Detalles)
-                .ThenInclude(d => d.Producto)
+                    .ThenInclude(d => d.Producto)
                 .ToListAsync());
         }
 
@@ -34,10 +36,11 @@ namespace PlumitaGrisAPI.Controllers
         {
             var pedido = await _context.Pedidos
                 .Include(p => p.Cliente)
+                    .ThenInclude(c => c.Usuario)
                 .Include(p => p.EstadoPedido)
                 .Include(p => p.ModalidadEntrega)
                 .Include(p => p.Detalles)
-                .ThenInclude(d => d.Producto)
+                    .ThenInclude(d => d.Producto)
                 .FirstOrDefaultAsync(p => p.IdPedido == id);
 
             if (pedido == null)
@@ -60,9 +63,9 @@ namespace PlumitaGrisAPI.Controllers
                 return BadRequest(new { mensaje = "La modalidad de entrega especificada no existe" });
 
             var idEstadoInicial = await _context.EstadosPedido
-                .Where(e => e.Nombre == "PENDIENTE_PAGO")
-                .Select(e => e.IdEstadoPedido)
-                .FirstOrDefaultAsync();
+    .Where(e => e.Nombre == "PENDIENTE")
+    .Select(e => e.IdEstadoPedido)
+    .FirstOrDefaultAsync();
 
             using var transaccion = await _context.Database.BeginTransactionAsync();
             try
@@ -113,7 +116,8 @@ namespace PlumitaGrisAPI.Controllers
             catch (Exception ex)
             {
                 await transaccion.RollbackAsync();
-                return StatusCode(500, new { mensaje = "Error al crear el pedido", detalle = ex.Message });
+                var detalle = ex.InnerException?.Message ?? ex.Message;
+                return StatusCode(500, new { mensaje = "Error al crear el pedido", detalle });
             }
         }
 
@@ -123,18 +127,42 @@ namespace PlumitaGrisAPI.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var estadoExiste = await _context.EstadosPedido.AnyAsync(e => e.IdEstadoPedido == dto.IdEstadoPedido);
-            if (!estadoExiste)
+            var nuevoEstado = await _context.EstadosPedido.FindAsync(dto.IdEstadoPedido);
+            if (nuevoEstado == null)
                 return BadRequest(new { mensaje = "El estado especificado no existe" });
 
-            var pedido = await _context.Pedidos.FindAsync(id);
+            var pedido = await _context.Pedidos
+                .Include(p => p.EstadoPedido)
+                .FirstOrDefaultAsync(p => p.IdPedido == id);
             if (pedido == null)
                 return NotFound(new { mensaje = $"Pedido con id {id} no encontrado" });
 
-            pedido.IdEstadoPedido = dto.IdEstadoPedido; 
-            await _context.SaveChangesAsync();
+            var estadoAnteriorNombre = pedido.EstadoPedido?.Nombre;
 
-            return Ok(pedido);
+            using var transaccion = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var errorStock = await InventarioService.AjustarStockPorCambioEstado(
+                    _context, id, estadoAnteriorNombre, nuevoEstado.Nombre);
+
+                if (errorStock != null)
+                {
+                    await transaccion.RollbackAsync();
+                    return Conflict(new { mensaje = errorStock });
+                }
+
+                pedido.IdEstadoPedido = dto.IdEstadoPedido;
+                await _context.SaveChangesAsync();
+                await transaccion.CommitAsync();
+
+                return Ok(pedido);
+            }
+            catch (Exception ex)
+            {
+                await transaccion.RollbackAsync();
+                var detalle = ex.InnerException?.Message ?? ex.Message;
+                return StatusCode(500, new { mensaje = "Error al actualizar el estado del pedido", detalle });
+            }
         }
 
         [HttpDelete("{id}")]
